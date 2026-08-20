@@ -1,6 +1,6 @@
-# Backlight Balance
+# Monitor Backlight Balance
 
-A desktop-wide, click-through overlay that evens out **backlight bleed, clouding, and uniformity problems** on LCD monitors — by dimming the *good* parts of the panel to match the bad ones.
+A desktop-wide, click-through overlay that evens out **backlight bleed, clouding, and uniformity problems on LCD monitors** — by dimming the *good* parts of the panel to match the bad ones.
 
 Written in AutoHotkey v2. No drivers, no injection, no admin rights.
 
@@ -56,16 +56,16 @@ Everything is smoothly interpolated and dithered, so there are no visible bands.
 **Option A — run the script**
 
 1. Install [AutoHotkey v2](https://www.autohotkey.com/)
-2. Download `backlight-balance.ahk`
+2. Download `monitor-backlight-balance.ahk`
 3. Double-click it
 
 **Option B — build a standalone .exe**
 
 ```
-Ahk2Exe.exe /in backlight-balance.ahk /out BacklightBalance.exe /base AutoHotkey64.exe
+Ahk2Exe.exe /in monitor-backlight-balance.ahk /out MonitorBacklightBalance.exe /base AutoHotkey64.exe
 ```
 
-Then right-click the tray icon → **시작프로그램 등록 / Register at startup**.
+Then right-click the tray icon → **Run at startup**.
 
 ---
 
@@ -139,7 +139,7 @@ It works best on mid-tone and bright content, which is most desktop use.
 
 **주의: 기본값은 특정 모니터 한 대에 맞춘 값입니다.** 본인 모니터에 맞게 [docs/CALIBRATION.md](docs/CALIBRATION.md)를 보고 다시 잡으셔야 합니다.
 
-단축키는 `Ctrl+Alt+O`(켜기/끄기), 트레이 아이콘 우클릭으로 시작프로그램 등록과 종료를 할 수 있습니다.
+단축키는 `Ctrl+Alt+O`(켜기/끄기), 트레이 아이콘 우클릭 → `Run at startup`으로 시작프로그램 등록, `Exit`으로 종료할 수 있습니다.
 
 ---
 

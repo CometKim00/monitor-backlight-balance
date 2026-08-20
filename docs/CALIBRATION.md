@@ -2,7 +2,7 @@
 
 The shipped values are tuned for one specific panel. This guide walks through retuning them for yours. Budget about ten minutes.
 
-You only ever edit the block marked **① 필요할 때 이 값들만 조절하면 됩니다** at the top of the script.
+You only ever edit the block marked **(1) TUNING** at the top of the script.
 
 ---
 

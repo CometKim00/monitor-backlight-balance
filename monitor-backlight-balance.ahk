@@ -2,49 +2,59 @@
 #SingleInstance Force
 
 ; ================================================================
-;  모니터 백라이트 얼룩(누런 끼) 완화용 그라데이션 오버레이
-;  대상: Alienware AW3418DW (우측 하단 얼룩, 실측 사진 기준 보정)
+;  Monitor Backlight Balance
+;  Evens out LCD backlight bleed / clouding / uniformity defects.
 ;
-;  동작 원리
-;  - 화면에서 경계선(아래 gradPoints) 위쪽은 그대로 두고(보정 없음)
-;  - 경계선 아래쪽(얼룩이 있는 우하단 방향)을 향해 부드러운
-;    그라데이션으로 점점 어둡게 덮어서 밝기/색감을 맞춤
-;  - GDI 레이어드 윈도우(픽셀별 알파)로 렌더링 → 계단 없는 매끈한 그라데이션
-;  - 클릭/키보드 입력은 모두 아래 프로그램으로 그대로 통과됨 (클릭스루)
+;  Defaults are tuned for one Alienware AW3418DW with a dim, yellowed
+;  patch in the lower-right. YOU WILL NEED TO RETUNE THEM.
+;  See docs/CALIBRATION.md.
 ;
-;  단축키 / 트레이 메뉴
-;  - Ctrl+Alt+O   : 오버레이 켜기/끄기
-;  - 트레이 아이콘 우클릭 → Exit : 완전 종료
-;  - 트레이 아이콘 우클릭 → "시작프로그램 등록" : Windows 부팅 시 자동 실행 on/off
+;  How it works
+;  - A boundary line (gradPoints) marks where the panel defect is.
+;  - Below that line the screen is left alone; above it, a smooth
+;    gradient dims the healthy panel down to match the defect.
+;  - Rendered as a GDI layered window with per-pixel alpha, so the
+;    gradient is continuous rather than stepped.
+;  - Click-through: all mouse and keyboard input passes underneath.
+;
+;  Hotkey / tray menu
+;  - Ctrl+Alt+O                     : toggle the overlay
+;  - Tray icon -> Exit              : quit
+;  - Tray icon -> Run at startup    : toggle launching on Windows boot
 ; ================================================================
 
 
 ; ---------------------------------------------------------------
-; ① 필요할 때 이 값들만 조절하면 됩니다
+; (1) TUNING - these are the only values you should need to touch
 ; ---------------------------------------------------------------
-maxAlpha     := 70      ; 가장 어둡게 덮을 진하기 (0~255, 클수록 진함)
-minAlpha     := 7       ; 얼룩(무보정 구역)에도 아주 살짝 깔아주는 최소 진하기
-                        ;   0으로 두면 얼룩 부분은 완전 무보정
-falloffDepth := 0.80    ; 경계선에서 위로 화면 세로 비율 이만큼 올라가면 최대 진하기 도달
-                        ;   (값이 클수록 그라데이션이 더 넓고 완만하게 퍼짐)
-yellowFix    := 8       ; 누런끼 상쇄 강도 (0~40 권장, 0이면 끔)
-                        ;   얼룩 구역에만 푸른빛을 섞어 노란기를 눌러줍니다.
-                        ;   빨강·초록만 더 깎는 방식이라 값이 클수록 그 부분이 살짝 더 어두워지고,
-                        ;   검은 화면에서는 아주 옅은 푸른기가 돌 수 있습니다.
-toggleKey    := "^!o"   ; 켜고 끄는 단축키 (기본: Ctrl+Alt+O)
-gradScale    := 5       ; 그라데이션 연산 해상도 축소 배율
-                        ;   작을수록 촘촘하고 매끄럽지만 시작할 때 계산이 오래 걸림
-                        ;   (10≈0.3초 / 5≈1.5초 / 4≈2.5초)
-dither       := true    ; 알파가 정수라 생기는 계단(밴딩)을 미세 노이즈로 흩어줌
+maxAlpha     := 70      ; Strongest dimming, 0-255. Higher = darker.
+minAlpha     := 7       ; Floor applied everywhere, including inside the
+                        ;   defect. Set to 0 to leave the defect untouched.
+falloffDepth := 0.80    ; How far above the boundary the gradient ramps
+                        ;   before reaching maxAlpha, in screen heights.
+                        ;   Higher = wider and gentler.
+yellowFix    := 8       ; Yellow-cast compensation, 0-40. 0 disables it.
+                        ;   Adds a blue tint over the defect only. Works by
+                        ;   cutting red and green further, so higher values
+                        ;   dim that area slightly more and leave a faint
+                        ;   blue cast on black content.
+toggleKey    := "^!o"   ; Show/hide hotkey. Default: Ctrl+Alt+O
+gradScale    := 5       ; Compute-resolution divisor. Lower = finer gradient
+                        ;   but slower startup.
+                        ;   (10 = ~0.3s, 5 = ~1.5s, 4 = ~2.5s)
+dither       := true    ; Scatter the banding caused by integer alpha.
 
-; ── 무보정 경계선 ──────────────────────────────────────────────
-; 화면 비율 좌표 (x: 왼쪽 0.0 ~ 오른쪽 1.0 / y: 위 0.0 ~ 아래 1.0)
-; 이 선 "아래"(백라이트 나간 누런 부분)는 무보정,
-; 이 선 "위"로 갈수록 점점 진하게 덮어 전체 밝기를 맞춥니다.
+; -- Boundary line ----------------------------------------------
+; Normalized screen coordinates (x: 0.0 left -> 1.0 right,
+;                                y: 0.0 top  -> 1.0 bottom)
+; BELOW this line = the defective area, left uncorrected.
+; ABOVE this line = progressively dimmed to match it.
 ;
-; y 값이 1.0을 넘으면 화면 아래쪽 바깥 = 그 세로줄은 전부 보정 대상이 됩니다.
-; 얼룩이 오른쪽에만 있으므로 왼쪽은 1.0을 넘겨 무보정 구역을 없앴습니다.
-; 왼쪽 끝은 패널 자체가 이미 살짝 어두워서(비네팅) 보정을 조금 덜 넣습니다.
+; A y value above 1.0 puts the boundary off the bottom of the screen,
+; meaning that whole column gets corrected. Use this where the defect
+; doesn't reach - here it only affects the right side, so the left is
+; pushed past 1.0... except at the very edge, where the panel already
+; vignettes and therefore needs less correction, not more.
 gradPoints := [
     {x: 0.00, y: 0.88},
     {x: 0.15, y: 0.94},
@@ -56,7 +66,7 @@ gradPoints := [
 
 
 ; ---------------------------------------------------------------
-; ② 내부 동작 (평소엔 건드릴 필요 없음)
+; (2) INTERNALS - no need to edit below here
 ; ---------------------------------------------------------------
 screenW := A_ScreenWidth
 screenH := A_ScreenHeight
@@ -72,7 +82,7 @@ Smoothstep(t) {
     return t * t * (3 - 2 * t)
 }
 
-; 경계선(gradPoints)을 구간별 매끄러운 보간으로 잇는 함수: u(가로비율) → v(경계선 세로비율)
+; Interpolate the boundary polyline: u (x fraction) -> v (y fraction)
 BoundaryV(u) {
     global gradPoints
     n := gradPoints.Length
@@ -91,12 +101,12 @@ BoundaryV(u) {
     return gradPoints[n].y
 }
 
-; 32bpp top-down DIB 섹션 생성 (알파 채널 포함)
+; Create a 32bpp top-down DIB section (with alpha channel)
 CreateDIB32(w, h) {
     bi := Buffer(40, 0)
     NumPut("Int", 40, bi, 0)      ; biSize
     NumPut("Int", w, bi, 4)       ; biWidth
-    NumPut("Int", -h, bi, 8)      ; biHeight (음수 = top-down)
+    NumPut("Int", -h, bi, 8)      ; biHeight (negative = top-down)
     NumPut("Short", 1, bi, 12)    ; biPlanes
     NumPut("Short", 32, bi, 14)   ; biBitCount
     NumPut("Int", 0, bi, 16)      ; BI_RGB
@@ -119,7 +129,7 @@ DestroyDIB(dib) {
     DllCall("gdi32\DeleteDC", "Ptr", dib.hdc)
 }
 
-; 저해상도로 그라데이션 알파를 계산한 뒤, 화면 전체 크기로 확대(StretchBlt)
+; Compute the alpha map at reduced resolution, then scale it up.
 BuildGradientBitmap() {
     global screenW, screenH, maxAlpha, minAlpha, falloffDepth, yellowFix, gradScale, dither
 
@@ -128,8 +138,9 @@ BuildGradientBitmap() {
 
     low := CreateDIB32(gw, gh)
 
-    ; 4x4 Bayer 디더 행렬. 알파를 정수로 반올림할 때 생기는 계단(밴딩)을
-    ; 픽셀마다 -0.5 ~ +0.5 범위로 미세하게 흔들어 눈에 안 띄게 흩어준다.
+    ; 4x4 Bayer matrix. Alpha is an 8-bit integer, so a 7->70 ramp across
+    ; 1440px puts each step ~23px apart - clearly visible as bands. Nudging
+    ; each pixel by -0.5..+0.5 before rounding scatters those transitions.
     bayer := [ 0, 8, 2,10
              ,12, 4,14, 6
              , 3,11, 1, 9
@@ -139,7 +150,7 @@ BuildGradientBitmap() {
         y := A_Index - 1
         v := (gh = 1) ? 0 : y / (gh - 1)
         rowOffset := y * gw * 4
-        bRow := Mod(y, 4) * 4          ; 이 행의 디더 행렬 시작 위치
+        bRow := Mod(y, 4) * 4          ; start of this row in the dither matrix
 
         loop gw {
             x := A_Index - 1
@@ -153,13 +164,18 @@ BuildGradientBitmap() {
                     d := 1
                 alphaF := maxAlpha * Smoothstep(d)
             }
-            if (alphaF < minAlpha)   ; 얼룩 구역도 최소한 이만큼은 깔아준다
+            if (alphaF < minAlpha)   ; apply the floor inside the defect too
                 alphaF := minAlpha
 
-            ; ── 누런끼 상쇄 ─────────────────────────────────────
-            ; 보정이 약한 곳(=얼룩)일수록 강하게, 이미 진한 곳은 0.
-            ; 빨강·초록만 추가로 깎고 파랑은 그대로 두어 노란기를 중화한다.
-            ;   결과: R,G는 (alpha + fix)만큼, B는 alpha만큼 감소 → 파랑이 fix만큼 상대적으로 올라감
+            ; -- Yellow-cast compensation ------------------------------
+            ; Strongest where correction is weakest (the defect), zero where
+            ; the overlay is already at full strength - so overall color
+            ; balance is untouched.
+            ;
+            ; Writing premultiplied blue = fix with total alpha = alpha + fix
+            ; composites to:  R,G reduced by (alpha + fix)
+            ;                 B   reduced by  alpha
+            ; i.e. a net blue shift of `fix`, cancelling the yellow.
             fixF := 0.0
             if (yellowFix > 0 && maxAlpha > 0) {
                 fixF := yellowFix * (1 - (alphaF / maxAlpha))
@@ -167,7 +183,6 @@ BuildGradientBitmap() {
                     fixF := 0.0
             }
 
-            ; 정수로 떨굴 때 디더 오프셋을 더해 밴딩 완화
             dOff := dither ? (bayer[bRow + Mod(x, 4) + 1] / 16) - 0.5 : 0
 
             alpha := Floor(alphaF + dOff + 0.5)
@@ -180,11 +195,11 @@ BuildGradientBitmap() {
             aTotal := alpha + fix
             if (aTotal > 255)
                 aTotal := 255
-            if (fix > aTotal)        ; 미리 곱해진 색은 알파를 넘을 수 없음
+            if (fix > aTotal)        ; premultiplied color can't exceed alpha
                 fix := aTotal
 
             off := rowOffset + (x * 4)
-            NumPut("UChar", fix, low.bits, off)         ; B (미리 곱해진 값)
+            NumPut("UChar", fix, low.bits, off)         ; B (premultiplied)
             NumPut("UChar", 0, low.bits, off + 1)       ; G
             NumPut("UChar", 0, low.bits, off + 2)       ; R
             NumPut("UChar", aTotal, low.bits, off + 3)  ; A
@@ -192,9 +207,9 @@ BuildGradientBitmap() {
     }
 
     full := CreateDIB32(screenW, screenH)
-    ; StretchBlt(HALFTONE)는 32bpp 알파 채널을 보존하지 못해 알파가 깨지는 문제가 있어
-    ; 알파를 인식하는 AlphaBlend로 확대(겸 합성)한다. dest가 전부 투명(0)에서 시작하므로
-    ; 결과적으로 source를 그대로 부드럽게 확대한 것과 동일해진다.
+    ; StretchBlt does not preserve the 32bpp alpha channel, which corrupts the
+    ; gradient. AlphaBlend is alpha-aware; since the destination starts fully
+    ; transparent, blending onto it is equivalent to a smooth upscale.
     blendFlag := (1 << 24) | (255 << 16) | (0 << 8) | 0  ; AC_SRC_ALPHA<<24 | SourceConstantAlpha<<16
     DllCall("msimg32\AlphaBlend"
         , "Ptr", full.hdc, "Int", 0, "Int", 0, "Int", screenW, "Int", screenH
@@ -247,52 +262,53 @@ ToggleOverlay(*) {
     if overlayOn {
         overlayGui.Hide()
         overlayOn := false
-        ToolTip("모니터 보정 OFF")
+        ToolTip("Backlight Balance: OFF")
     } else {
         if (overlayGui = "")
             BuildOverlay()
         else
             overlayGui.Show("NA")
         overlayOn := true
-        ToolTip("모니터 보정 ON")
+        ToolTip("Backlight Balance: ON")
     }
     SetTimer(() => ToolTip(), -1000)
 }
 
 
 ; ---------------------------------------------------------------
-; ③ 시작프로그램 등록 (트레이 메뉴에서 토글)
+; (3) Startup registration (toggled from the tray menu)
 ; ---------------------------------------------------------------
 startupLink := A_Startup "\MonitorBacklightBalance.lnk"
+startupMenuText := "Run at startup"
 
 ToggleStartup(*) {
     global startupLink
     if FileExist(startupLink) {
         FileDelete(startupLink)
-        ToolTip("시작프로그램 등록 해제됨")
+        ToolTip("Removed from startup")
     } else {
-        FileCreateShortcut(A_ScriptFullPath, startupLink, A_ScriptDir, "", "모니터 백라이트 보정")
-        ToolTip("시작프로그램에 등록됨")
+        FileCreateShortcut(A_ScriptFullPath, startupLink, A_ScriptDir, "", "Monitor Backlight Balance")
+        ToolTip("Added to startup")
     }
     SetTimer(() => ToolTip(), -1200)
     UpdateStartupMenuCheck()
 }
 
 UpdateStartupMenuCheck() {
-    global startupLink
+    global startupLink, startupMenuText
     if FileExist(startupLink)
-        A_TrayMenu.Check("시작프로그램 등록")
+        A_TrayMenu.Check(startupMenuText)
     else
-        A_TrayMenu.Uncheck("시작프로그램 등록")
+        A_TrayMenu.Uncheck(startupMenuText)
 }
 
 A_TrayMenu.Add()
-A_TrayMenu.Add("시작프로그램 등록", ToggleStartup)
+A_TrayMenu.Add(startupMenuText, ToggleStartup)
 UpdateStartupMenuCheck()
 
 
 ; ---------------------------------------------------------------
-; ④ 시작 시 자동으로 켜기
+; (4) Start with the overlay on
 ; ---------------------------------------------------------------
 BuildOverlay()
 overlayOn := true
