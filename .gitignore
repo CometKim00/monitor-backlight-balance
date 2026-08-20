@@ -1,0 +1,14 @@
+# Build output
+*.exe
+!setup/*.exe
+
+# Local tuning / scratch
+debug.log
+bench.txt
+bench.ahk
+*.local.ahk
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
