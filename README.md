@@ -23,6 +23,24 @@ This runs on the whole desktop, all the time, on any monitor.
 
 ---
 
+## Before / after
+
+Full-screen white, photographed in a dark room. Same panel, same monitor brightness.
+
+**Before** — the lower right is dim and visibly yellow:
+
+![Before](docs/before.jpg)
+
+**After** — the healthy areas are pulled down to match, and the yellow cast is neutralized:
+
+![After](docs/after.jpg)
+
+Measured across an 18-cell grid on the panel interior, yellowness variation drops from a
+range of 40 to 14, and brightness standard deviation from 10.8 to 8.7. The remaining
+brightness spread is mostly lens vignetting in the photo rather than the panel.
+
+*(Phone camera, handheld, so treat the numbers as indicative rather than lab-grade.)*
+
 ## What it looks like
 
 The overlay is a full-screen layered window with a **per-pixel alpha gradient**:
